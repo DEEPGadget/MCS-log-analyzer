@@ -9,3 +9,4 @@ reports/
 # 각자 로컬에서 백필/생성한다: python3 db/generate_kb.py db/cases.jsonl > db/knowledge-base.md
 db/cases.jsonl
 db/knowledge-base.md
+db/_staging/

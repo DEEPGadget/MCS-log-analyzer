@@ -39,6 +39,9 @@ Claude는 이 파일의 지침에 따라 로그를 읽고 `reports/` 디렉터�
 
 이 세 파일은 프로젝트 루트(`/home/deepgadget/MCS-log-analyzer/`)에 있다.
 
+추가로, **케이스 DB가 있으면**(`db/knowledge-base.md` 존재) Pass 1.5에서 이를 Read하여
+과거 사례를 사전지식으로 활용한다 (아래 "Pass 1.5" 참조). `db/`가 없으면 무시한다.
+
 ---
 
 ## 분석 실행 방법
@@ -47,6 +50,7 @@ Claude는 이 파일의 지침에 따라 로그를 읽고 `reports/` 디렉터�
 ```
 압축 해제 경로: /tmp/mcs-log-XXXXX/<archive-root>
 보고서 저장 경로: /home/deepgadget/MCS-log-analyzer/reports/<이름>.md
+케이스 스테이징 경로: /home/deepgadget/MCS-log-analyzer/db/_staging/<이름>.json   (db/ 존재 시에만)
 COMPLEXITY: simple | moderate | complex   (analyze.sh의 Haiku triage 결과)
 ```
 
@@ -105,6 +109,26 @@ COMPLEXITY: simple | moderate | complex   (analyze.sh의 Haiku triage 결과)
 
 판정 기준은 `judgment-rules.md`를 참조한다.
 
+### Pass 1.5 — 케이스 조회 (과거 사례 대조)
+
+Pass 1에서 메인보드 모델·`model_code`·호스트명·초기 증상을 파악한 직후, 과거 진단 이력을
+사전지식으로 활용한다. **`db/knowledge-base.md`가 없으면 이 단계 전체를 건너뛴다.**
+
+1. `db/knowledge-base.md`를 Read하여:
+   - **섹션 A (플랫폼 패턴)** — 이번 아카이브의 메인보드 모델과 일치하는 항목 확인 (고객사 무관 반복 결함)
+   - **섹션 C (모델 코드 인덱스)** — 같은 `model_code`/호스트의 과거 케이스 수와 recurring 이슈
+   - **섹션 D (시그니처 역인덱스)** — Pass 1에서 본 로그 토큰과 겹치는 항목
+2. 호스트명이 과거 케이스에 있으면 `db/cases.jsonl`을 그 host로 Grep하여 시계열을 확인한다
+   (예: `grep '"host":"RNDGPU02"' db/cases.jsonl`). 같은 host의 미해결 반복이면 보고서에
+   **"N번째 재발, 이전 권고 조치 미이행"** 으로 명시한다.
+3. **Pass 2 조준**: KB가 지목한 알려진 패턴(예: 이 보드의 PCIe BERT fatal, 이 host의 synosnap)을
+   Pass 2의 우선 확인 대상으로 삼는다.
+
+**가드레일 (필수)** — 과거 사례는 **가설**일 뿐이다:
+- 반드시 이번 아카이브의 실제 로그로 재확인한다. 증거가 없으면 "과거와 달리 이번엔 미발견"으로 기록.
+- KB에 있다는 이유만으로 없는 이슈를 만들지 않는다. KB에 없는 새 이슈도 평소대로 발굴한다.
+- 보고서 본문의 근거는 언제나 **이번 아카이브의 로그 인용**이어야 한다 (과거 케이스 인용으로 대체 금지).
+
 ### Pass 2 — Deep-dive (상세 분석, `moderate`/`complex`만)
 
 7. Pass 1에서 Critical 또는 Warning이 발견된 영역에 대해서만 추가 조사:
@@ -125,6 +149,12 @@ COMPLEXITY: simple | moderate | complex   (analyze.sh의 Haiku triage 결과)
 2. **보고서 구조 검증**: `report-template.md`의 섹션 순서·필수 섹션이 모두 포함되었는지 확인
 3. **보고서 형식**: `report-template.md` 구조를 따라 `Write` 도구로 지정된 경로에 저장
 4. stdout에 1~3줄 요약 출력
+5. **케이스 DB 적재 (staging)** — prompt에 `케이스 스테이징 경로`가 있을 때만 수행:
+   보고서를 `db/SCHEMA.md` 형식의 케이스 레코드 1줄(minified JSON)로 추출하여 그 경로에 `Write`한다.
+   - `case_id`(`<YYMMDD>-<gpu>-<host>`), `report_file`, `host`, `model_code`, `model`, `hw`,
+     `summary`, `issues[]`(각 이슈에 `signature` grep 토큰 포함)를 채운다.
+   - `recurring`은 전부 `false`로 둔다 (promote 단계에서 host별로 재계산됨).
+   - 이 파일은 analyze.sh가 검증 후 `cases.jsonl`로 promote한다. 추출 실패는 보고서에 영향 없음(무시).
 
 ---
 

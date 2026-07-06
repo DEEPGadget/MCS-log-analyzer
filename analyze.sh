@@ -518,11 +518,24 @@ info "환경 감지 완료: $(grep 'ENV_TYPE' "$ENV_HINTS")"
 # Claude는 CLAUDE.md를 자동으로 읽으므로 간결하게 작성
 ANALYSIS_START_TIME="$(date '+%Y-%m-%d %H:%M KST')"
 
+# ── 케이스 DB staging (db/knowledge-base.md 존재 시에만 활성화) ──────────────
+# 프로젝트 루트 = reports/ 의 부모. staging 파일은 보고서와 같은 basename의 .json.
+PROJECT_ROOT="$(cd "$(dirname "$REPORT_DIR")" && pwd)"
+DB_DIR="${PROJECT_ROOT}/db"
+REPORT_BASENAME="$(basename "$REPORT_FILE" .md)"
+STAGING_FILE="${DB_DIR}/_staging/${REPORT_BASENAME}.json"
+STAGING_PROMPT_LINE=""
+if [ -f "${DB_DIR}/knowledge-base.md" ]; then
+    mkdir -p "${DB_DIR}/_staging"
+    STAGING_PROMPT_LINE="케이스 스테이징 경로: ${STAGING_FILE}
+"
+fi
+
 PROMPT="로그 분석 작업을 시작합니다.
 
 압축 해제된 진단 아카이브 경로: ${EXTRACTED_DIR}
 보고서 저장 경로: ${REPORT_FILE}
-분석 시작 시각: ${ANALYSIS_START_TIME} (보고서 메타데이터의 분석 일시에 이 값을 사용하세요)
+${STAGING_PROMPT_LINE}분석 시작 시각: ${ANALYSIS_START_TIME} (보고서 메타데이터의 분석 일시에 이 값을 사용하세요)
 COMPLEXITY: ${COMPLEXITY:-moderate}
 
 전처리 결과: ${EXTRACTED_DIR}/_preprocessed/ 디렉터리에 정제된 로그 파일이 있습니다.
@@ -570,6 +583,15 @@ if [ -f "$REPORT_FILE" ]; then
     head -30 "$REPORT_FILE"
     echo "..."
     echo "(전체 보고서: $REPORT_FILE)"
+
+    # ── 케이스 DB promote (staging → cases.jsonl, db/ 활성 + staging 생성 시) ──
+    if [ -f "${DB_DIR}/knowledge-base.md" ] && [ -f "$STAGING_FILE" ]; then
+        if python3 "${DB_DIR}/promote_cases.py" "$DB_DIR" "$STAGING_FILE"; then
+            info "케이스 DB 갱신됨 (cases.jsonl + knowledge-base.md)"
+        else
+            warn "케이스 promote 실패 — staging 파일 보존: $STAGING_FILE"
+        fi
+    fi
 else
     warn "보고서 파일이 생성되지 않았습니다. Claude 출력을 확인하세요."
     warn "Claude가 Write 도구를 사용하지 않았을 수 있습니다."

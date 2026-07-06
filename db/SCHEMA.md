@@ -19,6 +19,7 @@
 | `hw` | object | 하드웨어 인벤토리 (아래) |
 | `summary` | object | `{critical, warning, info}` 건수 |
 | `issues` | array | 이슈 레코드 배열 (아래) — **진단 매칭의 핵심** |
+| `source` | string? | 적재 경로. 수동 백필은 없음, `analyze.sh` 자동 적재는 `"auto-analyze"` (오염 사후 필터용) |
 
 ## `model` (model_code 디코딩)
 
