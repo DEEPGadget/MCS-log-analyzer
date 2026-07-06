@@ -4,7 +4,8 @@
       "Read(/tmp/mcs-log-*/**)",
       "Read(/home/deepgadget/MCS-log-analyzer/**)",
       "Grep",
-      "Write(/home/deepgadget/MCS-log-analyzer/reports/**)"
+      "Write(/home/deepgadget/MCS-log-analyzer/reports/**)",
+      "Write(/home/deepgadget/MCS-log-analyzer/db/**)"
     ]
   },
   "hooks": {
@@ -14,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "p=$(jq -r \".tool_input.file_path\"); rp=$(realpath -m \"$p\" 2>/dev/null || echo \"$p\"); case \"$rp\" in /home/deepgadget/MCS-log-analyzer/reports/*) exit 0 ;; *) echo \"[hook:PreToolUse] Write 차단: $p 는 reports/ 외부입니다\" >&2; exit 2 ;; esac"
+            "command": "p=$(jq -r \".tool_input.file_path\"); rp=$(realpath -m \"$p\" 2>/dev/null || echo \"$p\"); case \"$rp\" in /home/deepgadget/MCS-log-analyzer/reports/*|/home/deepgadget/MCS-log-analyzer/db/*) exit 0 ;; *) echo \"[hook:PreToolUse] Write 차단: $p 는 reports/ 또는 db/ 외부입니다\" >&2; exit 2 ;; esac"
           }
         ]
       }
